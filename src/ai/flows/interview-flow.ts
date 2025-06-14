@@ -60,8 +60,7 @@ Focus on assessing the candidate.
 Conversation History:
 {{#if conversationHistory.length}}
   {{#each conversationHistory}}
-    {{#if (eq this.role "model")}}Interviewer: {{this.parts.0.text}}{{/if}}
-    {{#if (eq this.role "user")}}Candidate: {{this.parts.0.text}}{{/if}}
+    {{this.role}}: {{this.parts.0.text}}
   {{/each}}
 {{else}}
 (No conversation history yet. This is the start of the interview.)
