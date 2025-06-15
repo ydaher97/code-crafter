@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/layout/app-header";
@@ -11,11 +11,19 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, AlertCircle, BookOpen, Code, CalendarDays, ArrowLeft, HistoryIcon, Lightbulb } from "lucide-react";
+import { Loader2, AlertCircle, BookOpen, Code, CalendarDays, ArrowLeft, HistoryIcon, Lightbulb, Search, Filter, FileSearch } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, getDocs, Timestamp } from "firebase/firestore";
 import type { ChallengeHistoryEntry } from "@/app/challenge/page"; 
+
+type DifficultyFilter = "all" | "Beginner" | "Intermediate" | "Advanced";
+type StatusFilter = "all" | "passed" | "failed";
+type QuestionTypeFilter = "all" | "coding" | "conceptual";
+
 
 function HistoryPageContent() {
   const { user, loading: authLoading } = useAuth();
@@ -23,6 +31,16 @@ function HistoryPageContent() {
   const [historyEntries, setHistoryEntries] = useState<ChallengeHistoryEntry[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // State for filters and search
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTopicFilter, setSelectedTopicFilter] = useState<string>("all"); // "all" or specific topic
+  const [selectedDifficultyFilter, setSelectedDifficultyFilter] = useState<DifficultyFilter>("all");
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<StatusFilter>("all");
+  const [selectedQuestionTypeFilter, setSelectedQuestionTypeFilter] = useState<QuestionTypeFilter>("all");
+
+  const [availableTopics, setAvailableTopics] = useState<string[]>(["all"]);
+
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -45,11 +63,17 @@ function HistoryPageContent() {
           );
           const querySnapshot = await getDocs(q);
           const entries: ChallengeHistoryEntry[] = [];
+          const topicsSet = new Set<string>();
           querySnapshot.forEach((doc) => {
-            console.log("[FETCH_HISTORY_DOC] Fetched doc:", doc.id, "=>", doc.data());
-            entries.push({ id: doc.id, ...doc.data() } as ChallengeHistoryEntry);
+            const entryData = doc.data() as Omit<ChallengeHistoryEntry, 'id'>; // Type assertion
+            entries.push({ id: doc.id, ...entryData });
+            if (entryData.topic) { // Ensure topic is not null/undefined
+                topicsSet.add(entryData.topic);
+            }
           });
           setHistoryEntries(entries);
+          setAvailableTopics(["all", ...Array.from(topicsSet).sort()]);
+
           if (entries.length === 0) {
             console.log("[FETCH_HISTORY_RESULT] No history entries found for this user.");
           } else {
@@ -73,6 +97,27 @@ function HistoryPageContent() {
     }
   }, [user, authLoading]);
 
+  const filteredAndSearchedEntries = useMemo(() => {
+    return historyEntries.filter(entry => {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = !searchTerm.trim() || (
+        entry.topic?.toLowerCase().includes(searchLower) ||
+        entry.question?.toLowerCase().includes(searchLower) ||
+        entry.userSolution?.toLowerCase().includes(searchLower)
+      );
+
+      const matchesTopic = selectedTopicFilter === "all" || entry.topic === selectedTopicFilter;
+      const matchesDifficulty = selectedDifficultyFilter === "all" || entry.difficulty === selectedDifficultyFilter;
+      const matchesStatus = selectedStatusFilter === "all" || 
+                            (selectedStatusFilter === "passed" && entry.gradingResult.passed) || 
+                            (selectedStatusFilter === "failed" && !entry.gradingResult.passed);
+      const matchesQuestionType = selectedQuestionTypeFilter === "all" || entry.questionType === selectedQuestionTypeFilter;
+
+      return matchesSearch && matchesTopic && matchesDifficulty && matchesStatus && matchesQuestionType;
+    });
+  }, [historyEntries, searchTerm, selectedTopicFilter, selectedDifficultyFilter, selectedStatusFilter, selectedQuestionTypeFilter]);
+
+
   const formatDate = (timestamp: Timestamp | undefined) => {
     if (!timestamp) return "N/A";
     return timestamp.toDate().toLocaleDateString('en-US', {
@@ -93,7 +138,7 @@ function HistoryPageContent() {
     <div className="flex flex-col min-h-screen bg-background text-foreground font-body">
       <AppHeader />
       <main className="flex-grow container mx-auto px-4 py-8 space-y-8">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
           <h1 className="text-3xl font-headline flex items-center">
             <HistoryIcon className="mr-3 h-8 w-8 text-primary" /> Your Challenge History
           </h1>
@@ -103,6 +148,86 @@ function HistoryPageContent() {
             </Link>
           </Button>
         </div>
+
+        {/* Filters and Search Section */}
+        <Card className="p-4 sm:p-6 shadow-lg">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-end">
+            <div className="sm:col-span-2 lg:col-span-3 xl:col-span-5">
+              <Label htmlFor="search-history" className="text-sm font-medium">Search History</Label>
+              <div className="relative mt-1">
+                <Input
+                  id="search-history"
+                  type="text"
+                  placeholder="Search by topic, question, or your solution..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 text-base"
+                />
+                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="topic-filter" className="text-sm font-medium">Topic</Label>
+              <Select value={selectedTopicFilter} onValueChange={setSelectedTopicFilter}>
+                <SelectTrigger id="topic-filter" className="mt-1">
+                  <SelectValue placeholder="Filter by topic" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTopics.map(topic => (
+                    <SelectItem key={topic} value={topic}>
+                      {topic === "all" ? "All Topics" : topic}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="difficulty-filter" className="text-sm font-medium">Difficulty</Label>
+              <Select value={selectedDifficultyFilter} onValueChange={(value) => setSelectedDifficultyFilter(value as DifficultyFilter)}>
+                <SelectTrigger id="difficulty-filter" className="mt-1">
+                  <SelectValue placeholder="Filter by difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Difficulties</SelectItem>
+                  <SelectItem value="Beginner">Beginner</SelectItem>
+                  <SelectItem value="Intermediate">Intermediate</SelectItem>
+                  <SelectItem value="Advanced">Advanced</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label htmlFor="status-filter" className="text-sm font-medium">Status</Label>
+              <Select value={selectedStatusFilter} onValueChange={(value) => setSelectedStatusFilter(value as StatusFilter)}>
+                <SelectTrigger id="status-filter" className="mt-1">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="passed">Passed</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="questionType-filter" className="text-sm font-medium">Question Type</Label>
+              <Select value={selectedQuestionTypeFilter} onValueChange={(value) => setSelectedQuestionTypeFilter(value as QuestionTypeFilter)}>
+                <SelectTrigger id="questionType-filter" className="mt-1">
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="coding">Coding</SelectItem>
+                  <SelectItem value="conceptual">Conceptual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </Card>
+
 
         {isLoadingHistory && ( 
           <div className="flex justify-center items-center py-10">
@@ -122,6 +247,7 @@ function HistoryPageContent() {
         {!isLoadingHistory && !error && historyEntries.length === 0 && (
           <Card className="text-center py-10">
             <CardHeader>
+                <FileSearch className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <CardTitle className="text-2xl">No History Yet!</CardTitle>
             </CardHeader>
             <CardContent>
@@ -140,20 +266,38 @@ function HistoryPageContent() {
           </Card>
         )}
 
-        {!isLoadingHistory && !error && historyEntries.length > 0 && (
+        {!isLoadingHistory && !error && filteredAndSearchedEntries.length === 0 && historyEntries.length > 0 && (
+          <Card className="text-center py-10">
+             <CardHeader>
+                <FileSearch className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <CardTitle className="text-2xl">No Matching Entries</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                No history entries match your current search and filter criteria.
+              </p>
+              <p className="text-muted-foreground">
+                Try adjusting your filters or search term.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+
+        {!isLoadingHistory && !error && filteredAndSearchedEntries.length > 0 && (
           <div className="space-y-6">
-            {historyEntries.map((entry) => (
+            {filteredAndSearchedEntries.map((entry) => (
               <Card key={entry.id} className="shadow-lg">
                 <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div className="flex-grow">
                       <CardTitle className="font-headline text-xl">{entry.topic}</CardTitle>
                       <CardDescription className="flex items-center text-sm mt-1">
                         <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground" />
                         Completed: {formatDate(entry.createdAt)}
                       </CardDescription>
                     </div>
-                    <div className="flex gap-2 flex-wrap justify-end">
+                    <div className="flex gap-2 flex-wrap justify-start sm:justify-end items-center self-start sm:self-center">
                        <Badge variant={entry.gradingResult.passed ? "default" : "destructive"} className={`${entry.gradingResult.passed ? "bg-green-500" : "bg-red-500"} text-white`}>
                         {entry.gradingResult.passed ? "Passed" : "Failed"} (Score: {entry.gradingResult.score}/100)
                       </Badge>

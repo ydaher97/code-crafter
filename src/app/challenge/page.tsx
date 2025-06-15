@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, Timestamp, query, where, getDocs,getCountFromServer } from "firebase/firestore";
 import { ACHIEVEMENTS_LIST, type Achievement, type UserAchievement } from "@/lib/achievements";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 
 type Difficulty = "Beginner" | "Intermediate" | "Advanced";
@@ -66,6 +67,7 @@ function ChallengePageContent() {
   const [isSubmittingChallenge, setIsSubmittingChallenge] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hasValidParams, setHasValidParams] = useState<boolean | null>(null);
+  const isMobile = useIsMobile();
 
 
   useEffect(() => {
@@ -440,15 +442,25 @@ function ChallengePageContent() {
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground font-body">
       <AppHeader />
-      <main className="flex-grow container mx-auto px-4 py-8 space-y-8">
-        <div className="flex justify-between items-center">
-           <h1 className="text-2xl font-headline">Your Challenge</h1>
-           <div className="flex gap-2">
-            <Button onClick={handleRestartChallenge} variant="outline" disabled={isSelectorDisabled}>
-              <RotateCcw className="mr-2 h-4 w-4" /> Restart This Challenge
+      <main className={`flex-grow container mx-auto px-4 py-8 space-y-8 ${isMobile ? 'flex flex-col items-center' : ''}`}>
+        <div className={`flex ${isMobile ? 'flex-col items-center space-y-4 w-full' : 'justify-between items-center'} `}>
+           <h1 className={`text-2xl font-headline ${isMobile ? 'text-center' : ''}`}>Your Challenge</h1>
+           <div className={`flex ${isMobile ? 'flex-col gap-2 w-full' : 'gap-2'}`}>
+            <Button 
+              onClick={handleRestartChallenge} 
+              variant="outline" 
+              disabled={isSelectorDisabled}
+              className={isMobile ? 'w-full' : ''}
+            >
+              <RotateCcw className={`mr-2 h-4 w-4 ${isMobile ? 'flex-shrink-0' : ''}`} /> Restart This Challenge
             </Button>
-            <Button onClick={() => router.push('/')} variant="outline" disabled={isSelectorDisabled && !isLoadingQuestion}>
-              <Home className="mr-2 h-4 w-4" /> New Challenge (Dashboard)
+            <Button 
+              onClick={() => router.push('/')} 
+              variant="outline" 
+              disabled={isSelectorDisabled && !isLoadingQuestion}
+               className={isMobile ? 'w-full' : ''}
+            >
+              <Home className={`mr-2 h-4 w-4 ${isMobile ? 'flex-shrink-0' : ''}`} /> New Challenge (Dashboard)
             </Button>
            </div>
         </div>
