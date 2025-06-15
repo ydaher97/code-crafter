@@ -24,9 +24,9 @@ export type QuestionGenerationInput = z.infer<typeof QuestionGenerationInputSche
 
 const QuestionGenerationOutputSchema = z.object({
   codingQuestion: z.string().optional().describe('The coding question, if generated.'),
-  codingHint: z.string().optional().describe('Hint for the coding question, if generated.'),
+  codingHints: z.array(z.string()).optional().describe('An array of hints for the coding question, ordered from least to most revealing, if generated.'),
   conceptualQuestion: z.string().optional().describe('The conceptual question, if generated.'),
-  conceptualHint: z.string().optional().describe('Hint for the conceptual question, if generated.'),
+  conceptualHints: z.array(z.string()).optional().describe('An array of hints for the conceptual question, ordered from least to most revealing, if generated.'),
   questionTypeGenerated: z.enum(['coding', 'conceptual', 'both']).describe('Specifies if a coding, conceptual, or both types of questions were successfully generated.'),
 });
 export type QuestionGenerationOutput = z.infer<typeof QuestionGenerationOutputSchema>;
@@ -41,7 +41,7 @@ const SingleQuestionPromptInputSchema = z.object({
 
 const SingleQuestionPromptOutputSchema = z.object({
     question: z.string().describe('The generated question.'),
-    hint: z.string().describe('A concise, actionable hint for the generated question.'),
+    hints: z.array(z.string()).min(1).max(3).describe('An array of 1 to 3 hints for the generated question, ordered from least to most revealing. The first hint should be very general, subsequent hints can become more specific but must not give away the direct solution or include code snippets. If only one hint is appropriate, provide an array with that single hint.'),
 });
 
 const generateSingleQuestionPrompt = ai.definePrompt({
@@ -52,12 +52,16 @@ const generateSingleQuestionPrompt = ai.definePrompt({
 
   Based on the topic, difficulty, and the required question type ({{questionTypeToGenerate}}), generate:
   1. A specific {{questionTypeToGenerate}} question.
-  2. A single, concise, actionable hint for that question. The hint should help the user identify a key concept, suggest a general approach, or point towards a relevant language feature or pitfall. For conceptual questions, the hint might point towards key areas to research or consider. **Crucially, the hint must not give away the direct solution or include any code snippets.** Focus on guiding the user's thinking process.
+  2. An array of 1 to 3 hints for that question, ordered from least to most revealing.
+     - The first hint should be very general, guiding the user's thinking process or pointing to a broad concept.
+     - Subsequent hints can become slightly more specific (e.g., suggesting a particular approach or a relevant language feature or pitfall).
+     - **Crucially, hints must not give away the direct solution or include any code snippets.** Focus on guiding the user's thinking process.
+     - If only one hint is appropriate, provide an array with that single hint.
 
   Topic: {{{topic}}}
   Difficulty: {{{difficulty}}}
 
-  Provide the question and the hint according to the output schema.
+  Provide the question and the array of hints according to the output schema.
   Ensure the question is distinct and appropriate for the specified type.
   `,
 });
@@ -83,7 +87,7 @@ const generateQuestionFlow = ai.defineFlow(
       if (!output) throw new Error('Failed to generate coding question.');
       return {
         codingQuestion: output.question,
-        codingHint: output.hint,
+        codingHints: output.hints,
         questionTypeGenerated: 'coding',
       };
     } else if (input.preferredQuestionType === 'conceptual') {
@@ -95,7 +99,7 @@ const generateQuestionFlow = ai.defineFlow(
       if (!output) throw new Error('Failed to generate conceptual question.');
       return {
         conceptualQuestion: output.question,
-        conceptualHint: output.hint,
+        conceptualHints: output.hints,
         questionTypeGenerated: 'conceptual',
       };
     } else { // 'any', meaning user selected "Both"
@@ -118,9 +122,9 @@ const generateQuestionFlow = ai.defineFlow(
 
       return {
         codingQuestion: codingResponse.output.question,
-        codingHint: codingResponse.output.hint,
+        codingHints: codingResponse.output.hints,
         conceptualQuestion: conceptualResponse.output.question,
-        conceptualHint: conceptualResponse.output.hint,
+        conceptualHints: conceptualResponse.output.hints,
         questionTypeGenerated: 'both',
       };
     }

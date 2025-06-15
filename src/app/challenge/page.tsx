@@ -168,9 +168,9 @@ function ChallengePageContent() {
     return activeDisplayType === 'coding' ? challengeData.codingQuestion : challengeData.conceptualQuestion;
   }, [challengeData, activeDisplayType]);
 
-  const currentDisplayedHint = useMemo(() => {
+  const currentDisplayedHints = useMemo(() => {
     if (!challengeData || !activeDisplayType) return null;
-    return activeDisplayType === 'coding' ? challengeData.codingHint : challengeData.conceptualHint;
+    return activeDisplayType === 'coding' ? challengeData.codingHints : challengeData.conceptualHints;
   }, [challengeData, activeDisplayType]);
 
 
@@ -490,7 +490,7 @@ function ChallengePageContent() {
               question={currentDisplayedQuestion}
               questionType={activeDisplayType} 
               isLoadingQuestion={isLoadingQuestion}
-              questionHint={currentDisplayedHint}
+              questionHints={currentDisplayedHints || null}
               isQuestionAvailable={!!currentDisplayedQuestion && !!initialTopic && !!initialDifficulty}
             />
           </section>

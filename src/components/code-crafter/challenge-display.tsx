@@ -1,12 +1,11 @@
-
 "use client";
 
-import type { FC } from 'react';
+import { type FC, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Lightbulb, HelpCircle, Puzzle, BookOpen } from "lucide-react";
+import { Lightbulb, HelpCircle, Puzzle, BookOpen, ChevronDown } from "lucide-react";
 
 type ActiveDisplayType = "coding" | "conceptual" | null;
 
@@ -15,18 +14,34 @@ interface ChallengeDisplayProps {
   question: string | null; // This will be the question for the activeDisplayType
   questionType: ActiveDisplayType; // This is the active type being displayed
   isLoadingQuestion: boolean;
-  questionHint: string | null; // Hint for the active question
+  questionHints: string[] | null; // Hint for the active question
   isQuestionAvailable: boolean;
 }
 
 export const ChallengeDisplay: FC<ChallengeDisplayProps> = ({
   topic,
   question,
-  questionType, // Renamed from activeDisplayType for clarity within this component
+  questionType, 
   isLoadingQuestion,
-  questionHint,
+  questionHints,
   isQuestionAvailable,
 }) => {
+  const [revealedHintCount, setRevealedHintCount] = useState(0);
+
+  useEffect(() => {
+    // Reset revealed hints when the question (or hints) change
+    setRevealedHintCount(0);
+  }, [questionHints]);
+
+  const handleRevealNextHint = () => {
+    if (questionHints && revealedHintCount < questionHints.length) {
+      setRevealedHintCount(prevCount => prevCount + 1);
+    }
+  };
+
+  const totalHints = questionHints?.length || 0;
+  const canRevealMoreHints = totalHints > 0 && revealedHintCount < totalHints;
+
   const getTitleIcon = () => {
     if (questionType === 'coding') return <Puzzle className="mr-2 h-6 w-6 text-primary" />;
     if (questionType === 'conceptual') return <BookOpen className="mr-2 h-6 w-6 text-primary" />;
@@ -82,24 +97,36 @@ export const ChallengeDisplay: FC<ChallengeDisplayProps> = ({
           )}
         </div>
 
-        {isQuestionAvailable && questionHint && !isLoadingQuestion && (
-          <div className="mt-4 pt-4 border-t border-border">
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="hint">
-                <AccordionTrigger className="text-accent hover:text-accent/90 font-semibold text-base">
-                  <Lightbulb className="mr-2 h-5 w-5" /> Show Hint
-                </AccordionTrigger>
-                <AccordionContent className="pt-2 text-sm text-muted-foreground bg-muted/30 p-3 rounded-md whitespace-pre-wrap">
-                  {questionHint}
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+        {isQuestionAvailable && questionHints && questionHints.length > 0 && !isLoadingQuestion && (
+          <div className="mt-4 pt-4 border-t border-border space-y-3">
+            <h4 className="text-md font-semibold flex items-center">
+              <Lightbulb className="mr-2 h-5 w-5 text-accent"/>
+              Hints ({revealedHintCount}/{totalHints} revealed)
+            </h4>
+            {revealedHintCount > 0 && (
+              <div className="space-y-2">
+                {questionHints.slice(0, revealedHintCount).map((hint, index) => (
+                  <div key={index} className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-md whitespace-pre-wrap animate-in fade-in-50">
+                    <strong>Hint {index + 1}:</strong> {hint}
+                  </div>
+                ))}
+              </div>
+            )}
+            {canRevealMoreHints && (
+              <Button onClick={handleRevealNextHint} variant="outline" size="sm">
+                <ChevronDown className="mr-2 h-4 w-4" />
+                Reveal Next Hint ({revealedHintCount + 1}/{totalHints})
+              </Button>
+            )}
+            {!canRevealMoreHints && revealedHintCount > 0 && (
+                <p className="text-sm text-muted-foreground">All hints revealed.</p>
+            )}
           </div>
         )}
-         {!isLoadingQuestion && !question && !topic &&(
-            <CardDescription className="text-base text-muted-foreground pt-4 border-t mt-4">
-              Please make your selections above to start your learning journey!
-            </CardDescription>
+        {!isLoadingQuestion && !question && !topic && (
+          <CardDescription className="text-base text-muted-foreground pt-4 border-t mt-4">
+            Please make your selections above to start your learning journey!
+          </CardDescription>
         )}
       </CardContent>
     </Card>
